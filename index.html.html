@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>에어코리아 - 실시간 대기질 모니터링</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:       #080c14;
+      --surface:  #0e1624;
+      --card:     #111b2e;
+      --border:   #1e2f4a;
+      --accent:   #00d4ff;
+      --accent2:  #0099cc;
+      --good:     #00e676;
+      --moderate: #ffee58;
+      --bad:      #ff7043;
+      --vbad:     #e53935;
+      --text:     #e8f4fd;
+      --muted:    #5a7a9a;
+      --font-ko:  'Noto Sans KR', sans-serif;
+      --font-mono:'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-ko);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated Background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 20%, rgba(0,212,255,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 90% 80%, rgba(0,153,204,0.05) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Grid dots ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(0,212,255,0.12) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ── Header ── */
+    header {
+      position: relative;
+      z-index: 10;
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      background: rgba(8,12,20,0.85);
+      position: sticky;
+      top: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 20px rgba(0,212,255,0.4);
+    }
+
+    .logo-text {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-text span { color: var(--accent); }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .api-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--good);
+      box-shadow: 0 0 8px var(--good);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+
+    /* ── Main ── */
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Hero Section ── */
+    .hero {
+      text-align: center;
+      margin-bottom: 48px;
+      animation: fadeUp 0.8s ease both;
+    }
+
+    .hero-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.2);
+      padding: 6px 16px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -1.5px;
+      margin-bottom: 14px;
+    }
+
+    .hero h1 .highlight {
+      background: linear-gradient(90deg, var(--accent), #7b61ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 15px;
+      color: var(--muted);
+      font-weight: 300;
+      max-width: 500px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 40px;
+      animation: fadeUp 0.8s ease 0.15s both;
+    }
+
+    .select-wrapper {
+      position: relative;
+    }
+
+    .select-wrapper::after {
+      content: '';
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid var(--muted);
+      pointer-events: none;
+    }
+
+    select {
+      appearance: none;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-ko);
+      font-size: 14px;
+      padding: 12px 40px 12px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      min-width: 160px;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0,212,255,0.12);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: none;
+      font-family: var(--font-ko);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #000;
+      box-shadow: 0 4px 20px rgba(0,212,255,0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 28px rgba(0,212,255,0.45);
+    }
+
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-primary.loading { opacity: 0.7; pointer-events: none; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(0,0,0,0.3);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    .loading .spinner { display: block; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Summary Cards ── */
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 36px;
+      animation: fadeUp 0.8s ease 0.25s both;
+    }
+
+    .summary-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .summary-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+    }
+
+    .summary-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .card-value {
+      font-family: var(--font-mono);
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .card-unit {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .card-icon {
+      position: absolute;
+      bottom: 16px;
+      right: 20px;
+      font-size: 28px;
+      opacity: 0.15;
+    }
+
+    /* ── Data Table ── */
+    .table-section {
+      animation: fadeUp 0.8s ease 0.35s both;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title .line {
+      width: 3px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    .timestamp {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .table-wrapper {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: rgba(0,212,255,0.05);
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      padding: 14px 18px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 14px 18px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(30,47,74,0.5);
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    tbody tr {
+      transition: background 0.15s;
+    }
+
+    tbody tr:hover {
+      background: rgba(0,212,255,0.04);
+    }
+
+    .station-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .station-addr {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .grade-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .grade-1 { background: rgba(0,230,118,0.15); color: var(--good); border: 1px solid rgba(0,230,118,0.3); }
+    .grade-2 { background: rgba(255,238,88,0.15); color: var(--moderate); border: 1px solid rgba(255,238,88,0.3); }
+    .grade-3 { background: rgba(255,112,67,0.15); color: var(--bad); border: 1px solid rgba(255,112,67,0.3); }
+    .grade-4 { background: rgba(229,57,53,0.15); color: var(--vbad); border: 1px solid rgba(229,57,53,0.3); }
+
+    .val-mono {
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+
+    /* ── Progress Bar ── */
+    .pm-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .pm-bar-track {
+      width: 80px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .pm-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.8s ease;
+    }
+
+    /* ── Empty / Error / Loading state ── */
+    .state-box {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+
+    .state-box .state-icon {
+      font-size: 40px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .state-box p { font-size: 14px; line-height: 1.7; }
+
+    .state-box code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--accent);
+    }
+
+    /* ── Chart Section ── */
+    .chart-section {
+      margin-top: 36px;
+      animation: fadeUp 0.8s ease 0.45s both;
+    }
+
+    .chart-container {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+    }
+
+    .bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      height: 160px;
+      margin-top: 20px;
+      padding-bottom: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .bar-chart::after {
+      content: '';
+      position: absolute;
+      bottom: 28px;
+      left: 0; right: 0;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .bar-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .bar-fill-wrap {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      height: calc(100% - 28px);
+    }
+
+    .bar-val {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .bar-fill {
+      width: 70%;
+      border-radius: 4px 4px 0 0;
+      background: linear-gradient(180deg, var(--accent), var(--accent2));
+      box-shadow: 0 0 12px rgba(0,212,255,0.3);
+      transition: height 0.8s ease;
+      min-height: 2px;
+    }
+
+    .bar-label {
+      font-size: 10px;
+      color: var(--muted);
+      position: absolute;
+      bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 50px;
+      text-align: center;
+    }
+
+    /* ── Info Panel ── */
+    .info-panel {
+      margin-top: 36px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      animation: fadeUp 0.8s ease 0.5s both;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .info-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .info-item-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .info-item-content {
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .api-code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.8;
+    }
+
+    /* ── Footer ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 32px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.8;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      header { padding: 14px 20px; }
+      main { padding: 28px 16px 60px; }
+      th, td { padding: 10px 12px; }
+      .bar-chart { gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="#000" stroke-width="1.5"/>
+        <path d="M8 12c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="1.5" fill="#000"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">에어<span>코리아</span></div>
+      <div style="font-size:10px; color:var(--muted); margin-top:1px;">실시간 대기질 모니터링</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="api-badge">공공데이터포털 API</div>
+    <div class="live-dot"></div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main>
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-tag">공공데이터 포털 API 활용 프로젝트</div>
+    <h1>전국 <span class="highlight">실시간 대기질</span><br>모니터링 시스템</h1>
+    <p>한국환경공단 에어코리아 API를 활용하여<br>전국 측정소별 미세먼지 농도를 실시간으로 조회합니다.</p>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="select-wrapper">
+      <select id="sidoSelect">
+        <option value="서울">서울특별시</option>
+        <option value="부산">부산광역시</option>
+        <option value="대구">대구광역시</option>
+        <option value="인천">인천광역시</option>
+        <option value="광주">광주광역시</option>
+        <option value="대전">대전광역시</option>
+        <option value="울산">울산광역시</option>
+        <option value="경기">경기도</option>
+        <option value="강원">강원도</option>
+        <option value="충북">충청북도</option>
+        <option value="충남">충청남도</option>
+        <option value="전북">전북특별자치도</option>
+        <option value="전남">전라남도</option>
+        <option value="경북">경상북도</option>
+        <option value="경남">경상남도</option>
+        <option value="제주">제주특별자치도</option>
+        <option value="세종">세종특별자치시</option>
+      </select>
+    </div>
+    <div class="select-wrapper">
+      <select id="itemSelect">
+        <option value="PM10">미세먼지 (PM10)</option>
+        <option value="PM25">초미세먼지 (PM2.5)</option>
+        <option value="O3">오존 (O3)</option>
+        <option value="NO2">이산화질소 (NO2)</option>
+        <option value="CO">일산화탄소 (CO)</option>
+        <option value="SO2">아황산가스 (SO2)</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" id="fetchBtn" onclick="fetchData()">
+      <div class="spinner"></div>
+      <svg id="searchIcon" width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+        <path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      데이터 조회
+    </button>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="summary-row" id="summaryRow" style="display:none;">
+    <div class="summary-card">
+      <div class="card-label">측정 지역</div>
+      <div class="card-value" id="sumRegion" style="font-size:22px; padding-top:4px;">--</div>
+      <div class="card-unit">시/도</div>
+      <div class="card-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      </div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">측정소 수</div>
+      <div class="card-value" id="sumCount">--</div>
+      <div class="card-unit">개 측정소</div>
+      <div class="card-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+      </div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">평균 농도</div>
+      <div class="card-value" id="sumAvg">--</div>
+      <div class="card-unit" id="sumUnit">ug/m3</div>
+      <div class="card-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+      </div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">전체 등급</div>
+      <div class="card-value" id="sumGrade" style="font-size:22px; padding-top:4px;">--</div>
+      <div class="card-unit">통합 대기질</div>
+      <div class="card-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table Section -->
+  <div class="table-section">
+    <div class="section-header">
+      <div class="section-title">
+        <div class="line"></div>
+        측정소별 상세 데이터
+      </div>
+      <div class="timestamp" id="updateTime"></div>
+    </div>
+    <div class="table-wrapper">
+      <div id="tableContent">
+        <div class="state-box">
+          <span class="state-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="rgba(90,122,154,0.5)" stroke-width="1.5"/>
+              <path d="M8 12c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4" stroke="rgba(90,122,154,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="12" cy="12" r="1.5" fill="rgba(90,122,154,0.5)"/>
+            </svg>
+          </span>
+          <p>지역과 항목을 선택한 후 <strong style="color:var(--text)">데이터 조회</strong> 버튼을 눌러주세요.<br/>
+          <br/>한국환경공단 에어코리아 실시간 대기질 데이터를 불러옵니다.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Section -->
+  <div class="chart-section" id="chartSection" style="display:none;">
+    <div class="chart-container">
+      <div class="section-title">
+        <div class="line"></div>
+        <span id="chartTitle">측정소별 농도 시각화</span>
+      </div>
+      <div class="bar-chart" id="barChart"></div>
+    </div>
+  </div>
+
+  <!-- Info Panel -->
+  <div class="info-panel">
+    <div class="section-title">
+      <div class="line"></div>
+      API 정보 및 등급 기준
+    </div>
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-item-title">데이터 출처</div>
+        <div class="info-item-content">
+          한국환경공단<br/>에어코리아 (AirKorea)<br/>
+          <span style="color:var(--accent); font-size:12px;">data.go.kr</span>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-title">API 서비스명</div>
+        <div class="info-item-content">
+          시도별 실시간<br/>측정정보 조회서비스<br/>
+          <span style="color:var(--accent); font-size:12px;">getCtprvnRltmMesureDnsty</span>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-title">PM10 등급 기준</div>
+        <div class="info-item-content" style="line-height:1.9">
+          <span class="grade-badge grade-1" style="font-size:11px; margin-bottom:2px; display:inline-flex">좋음</span> 0 ~ 30<br/>
+          <span class="grade-badge grade-2" style="font-size:11px; margin-bottom:2px; display:inline-flex">보통</span> 31 ~ 80<br/>
+          <span class="grade-badge grade-3" style="font-size:11px; margin-bottom:2px; display:inline-flex">나쁨</span> 81 ~ 150<br/>
+          <span class="grade-badge grade-4" style="font-size:11px; display:inline-flex">매우나쁨</span> 151 ~
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-title">업데이트 주기</div>
+        <div class="info-item-content">
+          매 시간<br/>실시간 갱신<br/>
+          <span style="color:var(--accent); font-size:12px;">1시간 단위</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <div class="info-item-title" style="margin-bottom:8px; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--muted);">API 요청 URL 예시</div>
+      <div class="api-code-block" id="apiCodeBlock">-- 데이터 조회 후 표시됩니다 --</div>
+    </div>
+  </div>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div style="margin-bottom:8px; font-size:13px; font-weight:600; color:var(--text);">에어코리아 실시간 대기질 모니터링</div>
+  데이터 출처: <a href="https://www.data.go.kr" target="_blank">공공데이터포털 (data.go.kr)</a> &nbsp;|&nbsp;
+  제공: 한국환경공단 에어코리아<br/>
+  본 웹사이트는 정보 교과 수행평가 목적으로 제작되었습니다.
+</footer>
+
+<script>
+  const API_KEY = "8e6a7b159345e3830d0b2bc209a820d5f8ac377b632ed563f160bd277cadfba9";
+  const BASE_URL = "https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty";
+
+  const ITEM_UNITS = {
+    PM10: "ug/m3", PM25: "ug/m3",
+    O3: "ppm", NO2: "ppm", CO: "ppm", SO2: "ppm"
+  };
+
+  const ITEM_KEYS = {
+    PM10: "pm10Value", PM25: "pm25Value",
+    O3: "o3Value", NO2: "no2Value", CO: "coValue", SO2: "so2Value"
+  };
+
+  const GRADE_KEYS = {
+    PM10: "pm10Grade", PM25: "pm25Grade",
+    O3: "o3Grade", NO2: "no2Grade", CO: "coGrade", SO2: "so2Grade"
+  };
+
+  const GRADE_LABELS = { "1": "좋음", "2": "보통", "3": "나쁨", "4": "매우나쁨" };
+  const GRADE_CLASSES = { "1": "grade-1", "2": "grade-2", "3": "grade-3", "4": "grade-4" };
+  const GRADE_COLORS = { "1": "#00e676", "2": "#ffee58", "3": "#ff7043", "4": "#e53935" };
+
+  // Demo fallback data if API CORS fails
+  const DEMO_DATA = {
+    "서울": [
+      {stationName:"종로구",addr:"서울 종로구 종로35가길 19",pm10Value:"28",pm25Value:"15",o3Value:"0.031",no2Value:"0.021",coValue:"0.5",so2Value:"0.003",pm10Grade:"1",pm25Grade:"1",dataTime:"2026-05-10 13:00"},
+      {stationName:"중구",addr:"서울 중구 덕수궁길 15",pm10Value:"45",pm25Value:"22",o3Value:"0.028",no2Value:"0.035",coValue:"0.6",so2Value:"0.004",pm10Grade:"2",pm25Grade:"2",dataTime:"2026-05-10 13:00"},
+      {stationName:"용산구",addr:"서울 용산구 녹사평대로 150",pm10Value:"62",pm25Value:"31",o3Value:"0.025",no2Value:"0.041",coValue:"0.7",so2Value:"0.005",pm10Grade:"2",pm25Grade:"3",dataTime:"2026-05-10 13:00"},
+      {stationName:"성동구",addr:"서울 성동구 왕십리로 222",pm10Value:"35",pm25Value:"18",o3Value:"0.033",no2Value:"0.028",coValue:"0.5",so2Value:"0.003",pm10Grade:"2",pm25Grade:"2",dataTime:"2026-05-10 13:00"},
+      {stationName:"광진구",addr:"서울 광진구 능동로 209",pm10Value:"29",pm25Value:"14",o3Value:"0.036",no2Value:"0.020",coValue:"0.4",so2Value:"0.002",pm10Grade:"1",pm25Grade:"1",dataTime:"2026-05-10 13:00"},
+      {stationName:"동대문구",addr:"서울 동대문구 천호대로 145",pm10Value:"51",pm25Value:"27",o3Value:"0.029",no2Value:"0.038",coValue:"0.6",so2Value:"0.004",pm10Grade:"2",pm25Grade:"2",dataTime:"2026-05-10 13:00"},
+      {stationName:"성북구",addr:"서울 성북구 보문로 168",pm10Value:"40",pm25Value:"20",o3Value:"0.034",no2Value:"0.030",coValue:"0.5",so2Value:"0.003",pm10Grade:"2",pm25Grade:"2",dataTime:"2026-05-10 13:00"},
+      {stationName:"강북구",addr:"서울 강북구 인수봉로 131",pm10Value:"33",pm25Value:"16",o3Value:"0.037",no2Value:"0.024",coValue:"0.4",so2Value:"0.002",pm10Grade:"2",pm25Grade:"2",dataTime:"2026-05-10 13:00"},
+      {stationName:"노원구",addr:"서울 노원구 동일로 1306",pm10Value:"27",pm25Value:"13",o3Value:"0.040",no2Value:"0.018",coValue:"0.3",so2Value:"0.002",pm10Grade:"1",pm25Grade:"1",dataTime:"2026-05-10 13:00"},
+      {stationName:"강남구",addr:"서울 강남구 테헤란로 521",pm10Value:"48",pm25Value:"24",o3Value:"0.027",no2Value:"0.042",coValue:"0.7",so2Value:"0.005",pm10Grade:"2",pm25Grade:"2",dataTime:"2026-05-10 13:00"},
+    ]
+  };
+
+  async function fetchData() {
+    const sido = document.getElementById("sidoSelect").value;
+    const sidoFull = document.getElementById("sidoSelect").options[document.getElementById("sidoSelect").selectedIndex].text;
+    const item = document.getElementById("itemSelect").value;
+    const unit = ITEM_UNITS[item];
+
+    const btn = document.getElementById("fetchBtn");
+    const searchIcon = document.getElementById("searchIcon");
+    btn.classList.add("loading");
+    searchIcon.style.display = "none";
+
+    const params = new URLSearchParams({
+      serviceKey: API_KEY,
+      returnType: "json",
+      numOfRows: "100",
+      pageNo: "1",
+      sidoName: sido,
+      ver: "1.0"
+    });
+
+    const requestUrl = `${BASE_URL}?${params.toString()}`;
+
+    // Update API code block
+    document.getElementById("apiCodeBlock").textContent =
+`GET ${BASE_URL}
+    ?serviceKey=*****(인증키)
+    &returnType=json
+    &numOfRows=100
+    &pageNo=1
+    &sidoName=${sido}
+    &ver=1.0
+
+응답 형식: JSON
+측정항목 키: ${ITEM_KEYS[item]}
+등급 키: ${GRADE_KEYS[item]}`;
+
+    let items = [];
+    let isDemo = false;
+
+    try {
+      const res = await fetch(requestUrl);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const json = await res.json();
+      const body = json?.response?.body;
+      if (body && body.items && Array.isArray(body.items)) {
+        items = body.items;
+      } else {
+        throw new Error("빈 응답");
+      }
+    } catch(err) {
+      // CORS or network issue - use demo data
+      console.warn("API 요청 실패 (CORS 또는 네트워크 오류). 데모 데이터를 사용합니다:", err.message);
+      isDemo = true;
+      items = DEMO_DATA[sido] || DEMO_DATA["서울"];
+    }
+
+    btn.classList.remove("loading");
+    searchIcon.style.display = "block";
+
+    if (items.length === 0) {
+      document.getElementById("tableContent").innerHTML = `
+        <div class="state-box">
+          <span class="state-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="rgba(255,112,67,0.6)" stroke-width="1.5"/>
+              <path d="M12 8v4M12 16h.01" stroke="rgba(255,112,67,0.8)" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <p>데이터가 없습니다. 다른 지역을 선택해 보세요.</p>
+        </div>`;
+      document.getElementById("summaryRow").style.display = "none";
+      document.getElementById("chartSection").style.display = "none";
+      return;
+    }
+
+    const valueKey = ITEM_KEYS[item];
+    const gradeKey = GRADE_KEYS[item];
+
+    // Calculate summary
+    const validVals = items
+      .map(it => parseFloat(it[valueKey]))
+      .filter(v => !isNaN(v) && v >= 0);
+
+    const avg = validVals.length
+      ? (validVals.reduce((a,b) => a+b, 0) / validVals.length).toFixed(1)
+      : "--";
+
+    const grades = items.map(it => it[gradeKey]).filter(Boolean);
+    const gradeCounts = {};
+    grades.forEach(g => { gradeCounts[g] = (gradeCounts[g]||0)+1; });
+    const dominantGrade = Object.entries(gradeCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || "2";
+
+    // Update summary cards
+    document.getElementById("summaryRow").style.display = "grid";
+    document.getElementById("sumRegion").textContent = sidoFull.slice(0,5);
+    document.getElementById("sumCount").textContent = items.length;
+    document.getElementById("sumAvg").textContent = avg;
+    document.getElementById("sumUnit").textContent = unit;
+    document.getElementById("sumGrade").innerHTML = `<span class="grade-badge ${GRADE_CLASSES[dominantGrade]}" style="font-size:18px;">${GRADE_LABELS[dominantGrade]||"보통"}</span>`;
+
+    // Update timestamp
+    const now = new Date();
+    const timeStr = now.toLocaleDateString("ko-KR") + " " + now.toLocaleTimeString("ko-KR", {hour:"2-digit",minute:"2-digit"});
+    document.getElementById("updateTime").textContent = (isDemo ? "[데모] " : "") + "최종 업데이트: " + timeStr;
+
+    // Build table
+    const maxVal = Math.max(...validVals, 1);
+    let tableHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>측정소</th>
+            <th>${document.getElementById("itemSelect").options[document.getElementById("itemSelect").selectedIndex].text}</th>
+            <th>등급</th>
+            <th>농도 바</th>
+            <th>측정 시각</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    items.forEach(it => {
+      const val = it[valueKey];
+      const grade = it[gradeKey] || "2";
+      const numVal = parseFloat(val);
+      const pct = (!isNaN(numVal) && numVal >= 0) ? Math.min((numVal/maxVal)*100, 100) : 0;
+      const gradeLabel = GRADE_LABELS[grade] || "보통";
+      const gradeCls = GRADE_CLASSES[grade] || "grade-2";
+      const gradeColor = GRADE_COLORS[grade] || "#ffee58";
+      const displayVal = (val === null || val === undefined || val === "" || val === "-") ? "-" : val;
+
+      tableHTML += `
+        <tr>
+          <td>
+            <div class="station-name">${it.stationName || "-"}</div>
+            <div class="station-addr">${(it.addr||"").slice(0,25)}</div>
+          </td>
+          <td><span class="val-mono">${displayVal}</span> <span style="font-size:11px;color:var(--muted)">${unit}</span></td>
+          <td><span class="grade-badge ${gradeCls}">${gradeLabel}</span></td>
+          <td>
+            <div class="pm-bar">
+              <div class="pm-bar-track">
+                <div class="pm-bar-fill" style="width:${pct}%;background:${gradeColor};"></div>
+              </div>
+              <span style="font-size:10px;color:var(--muted)">${pct.toFixed(0)}%</span>
+            </div>
+          </td>
+          <td><span style="font-size:11px;font-family:var(--font-mono);color:var(--muted)">${(it.dataTime||"").slice(11,16)}</span></td>
+        </tr>`;
+    });
+
+    tableHTML += "</tbody></table>";
+    document.getElementById("tableContent").innerHTML = tableHTML;
+
+    // Build chart (top 12 stations)
+    const chartItems = [...items]
+      .filter(it => !isNaN(parseFloat(it[valueKey])))
+      .sort((a,b) => parseFloat(b[valueKey]) - parseFloat(a[valueKey]))
+      .slice(0, 12);
+
+    const chartMax = Math.max(...chartItems.map(it=>parseFloat(it[valueKey])), 1);
+
+    document.getElementById("chartSection").style.display = "block";
+    document.getElementById("chartTitle").textContent = `${sidoFull} ${document.getElementById("itemSelect").options[document.getElementById("itemSelect").selectedIndex].text} 농도 TOP ${chartItems.length}`;
+
+    let chartHTML = "";
+    chartItems.forEach(it => {
+      const v = parseFloat(it[valueKey]);
+      const hPct = (v / chartMax) * 100;
+      const grade = it[gradeKey] || "2";
+      const col = GRADE_COLORS[grade] || "#ffee58";
+      chartHTML += `
+        <div class="bar-item" style="position:relative;">
+          <div class="bar-fill-wrap">
+            <div class="bar-val">${v}</div>
+            <div class="bar-fill" style="height:${hPct}%;background:linear-gradient(180deg,${col},${col}99);box-shadow:0 0 12px ${col}55;"></div>
+          </div>
+          <div class="bar-label">${it.stationName||""}</div>
+        </div>`;
+    });
+
+    document.getElementById("barChart").innerHTML = chartHTML;
+  }
+
+  // Auto-load on page ready
+  window.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => fetchData(), 600);
+  });
+</script>
+
+</body>
+</html>
